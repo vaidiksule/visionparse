@@ -1,7 +1,6 @@
-﻿from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import User
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.core.files.base import ContentFile
@@ -10,25 +9,10 @@ from .models import UserDocument, DocumentBatch
 import os
 import uuid
 
-def get_or_create_default_user():
-    """Get or create a default user for testing without authentication"""
-    try:
-        return User.objects.get(username='default_user')
-    except User.DoesNotExist:
-        return User.objects.create_user(
-            username='default_user',
-            email='default@example.com',
-            password='defaultpass123'
-        )
-
-# @login_required  # TEMPORARILY COMMENTED OUT FOR TESTING
+@login_required
 def upload_and_parse_documents(request):
-    # TEMPORARY: Use default user instead of request.user
-    default_user = get_or_create_default_user()
-    
     # Get user's recent batches
-    # user_batches = DocumentBatch.objects.filter(user=request.user).order_by('-created_at')[:5]  # ORIGINAL
-    user_batches = DocumentBatch.objects.filter(user=default_user).order_by('-created_at')[:5]  # TEMPORARY
+    user_batches = DocumentBatch.objects.filter(user=request.user).order_by('-created_at')[:5]
     
     if request.method == 'POST':
         # Handle multiple file uploads
@@ -55,8 +39,7 @@ def upload_and_parse_documents(request):
         
         # Create batch
         batch = DocumentBatch.objects.create(
-            # user=request.user,  # ORIGINAL
-            user=default_user,  # TEMPORARY
+            user=request.user,
             status='pending',
             result_format='xml'  # Default to XML for now
         )
@@ -65,8 +48,7 @@ def upload_and_parse_documents(request):
         for uploaded_file in valid_files:
             uploaded_file.name = get_valid_filename(uploaded_file.name)
             user_doc = UserDocument.objects.create(
-                # user=request.user,  # ORIGINAL
-                user=default_user,  # TEMPORARY
+                user=request.user,
                 file=uploaded_file
             )
             batch.documents.add(user_doc)
@@ -86,21 +68,17 @@ def upload_and_parse_documents(request):
     
     return render(request, 'parser/upload.html', {'user_batches': user_batches})
 
-# @login_required  # TEMPORARILY COMMENTED OUT FOR TESTING
+@login_required
 def batch_result(request, batch_id):
-    # batch = get_object_or_404(DocumentBatch, id=batch_id, user=request.user)  # ORIGINAL
-    default_user = get_or_create_default_user()
-    batch = get_object_or_404(DocumentBatch, id=batch_id, user=default_user)  # TEMPORARY
+    batch = get_object_or_404(DocumentBatch, id=batch_id, user=request.user)
     return render(request, 'parser/batch_result.html', {'batch': batch})
 
 @csrf_exempt
-# @login_required  # TEMPORARILY COMMENTED OUT FOR TESTING
+@login_required
 def delete_document(request, doc_id):
     if request.method == 'POST':
         try:
-            # document = UserDocument.objects.get(id=doc_id, user=request.user)  # ORIGINAL
-            default_user = get_or_create_default_user()
-            document = UserDocument.objects.get(id=doc_id, user=default_user)  # TEMPORARY
+            document = UserDocument.objects.get(id=doc_id, user=request.user)
             document.delete()
             return JsonResponse({'success': True})
         except UserDocument.DoesNotExist:

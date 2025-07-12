@@ -20,6 +20,7 @@ ALLOWED_HOSTS = ['*']
 
 LOGIN_REDIRECT_URL = '/parser/'
 LOGOUT_REDIRECT_URL = '/'
+LOGIN_URL = '/admin/login/'
 
 INSTALLED_APPS = [
     'django.contrib.admin',
