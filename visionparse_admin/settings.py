@@ -3,7 +3,12 @@ from pathlib import Path
 from decouple import config
 import dj_database_url
 
+
+
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 NPM_BIN_PATH = r"C:\Program Files\nodejs\npm.cmd"
 
@@ -26,7 +31,7 @@ EXTERNAL_APPS = [
     'core',
     'tailwind',
     'theme',  # name we'll give your Tailwind app
-    'django_browser_reload',
+    'parser',
 ]
 INSTALLED_APPS += EXTERNAL_APPS
 
@@ -70,16 +75,16 @@ WSGI_APPLICATION = 'visionparse_admin.wsgi.application'
 
 
 # Production (Render)
-# DATABASES = {
-#     'default': dj_database_url.config("DATABASE_URL")
-# }
-
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / "db.sqlite3",
-    }
+    'default': dj_database_url.config("DATABASE_URL")
 }
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / "db.sqlite3",
+#     }
+# }
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -106,5 +111,6 @@ USE_TZ = True
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATIC_URL = "/static/"
+
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

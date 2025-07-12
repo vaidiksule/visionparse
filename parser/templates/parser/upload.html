@@ -1,0 +1,54 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Document Upload</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-900">
+
+<div class="container mx-auto p-6">
+    <h1 class="text-3xl font-bold mb-4">Upload Document</h1>
+
+    {% if messages %}
+        <div>
+            {% for message in messages %}
+                <div class="mb-4 p-4 rounded {{ message.tags }} bg-green-100 text-green-700">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <form action="{% url 'upload_doc' %}" method="post" enctype="multipart/form-data" class="mb-6">
+        {% csrf_token %}
+        <div class="flex items-center space-x-4">
+            <input type="file" name="document" required class="p-2 border rounded">
+            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Upload</button>
+        </div>
+    </form>
+
+    <h2 class="text-xl font-semibold mb-3">Uploaded Documents</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {% for doc in documents %}
+            <div class="bg-white p-4 rounded shadow-md">
+                {% if doc.is_image %}
+                    <img src="{{ doc.file.url }}" alt="Preview" class="h-48 w-full object-cover rounded">
+                {% elif doc.is_pdf %}
+                    <div class="h-48 flex items-center justify-center bg-gray-200 text-gray-500">
+                        PDF Preview Not Available
+                    </div>
+                {% endif %}
+                <p class="mt-2 font-medium">{{ doc.file_name }}</p>
+                <form method="post" action="{% url 'delete_document' doc.id %}" class="mt-2">
+                    {% csrf_token %}
+                    <button type="submit" class="text-red-500 hover:underline text-sm">Delete</button>
+                </form>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+</body>
+</html>
