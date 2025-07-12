@@ -44,9 +44,6 @@ EXTERNAL_APPS = [
 
 INSTALLED_APPS += EXTERNAL_APPS
 
-if os.environ.get("RENDER", "") != "true":  # Only include during local dev
-    INSTALLED_APPS += ["django_browser_reload"]
-    MIDDLEWARE.insert(0, "django_browser_reload.middleware.BrowserReloadMiddleware")
 
 TAILWIND_APP_NAME = 'theme'
 INTERNAL_IPS = ['127.0.0.1']
@@ -61,6 +58,11 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_browser_reload.middleware.BrowserReloadMiddleware',
 ]
+
+
+if os.environ.get("RENDER", "") != "true":  # Only include during local dev
+    INSTALLED_APPS += ["django_browser_reload"]
+    MIDDLEWARE.insert(0, "django_browser_reload.middleware.BrowserReloadMiddleware")
 
 ROOT_URLCONF = 'visionparse_admin.urls'
 
