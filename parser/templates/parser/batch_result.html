@@ -1,0 +1,129 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VisionParse - Batch Result</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900 mb-2">VisionParse</h1>
+            <p class="text-gray-600">Document Processing Results</p>
+        </div>
+
+        <!-- Back Button -->
+        <div class="mb-6">
+            <a href="{% url 'upload_doc' %}" class="inline-flex items-center space-x-2 text-blue-600 hover:text-blue-800">
+                <i data-feather="arrow-left" class="w-4 h-4"></i>
+                <span>Back to Upload</span>
+            </a>
+        </div>
+
+        <!-- Batch Info Card -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-900">Batch #{{ batch.id }}</h2>
+                    <p class="text-gray-600">Processed on {{ batch.created_at|date:"F d, Y at H:i" }}</p>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <span class="px-3 py-1 text-sm font-medium rounded-full 
+                        {% if batch.status == 'completed' %}bg-green-100 text-green-800
+                        {% elif batch.status == 'processing' %}bg-blue-100 text-blue-800
+                        {% elif batch.status == 'failed' %}bg-red-100 text-red-800
+                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                        {{ batch.status|title }}
+                    </span>
+                    {% if batch.status == 'completed' and batch.result_file %}
+                        <a href="{{ batch.result_file.url }}" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2">
+                            <i data-feather="download" class="w-4 h-4"></i>
+                            <span>Download {{ batch.result_format|upper }}</span>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Batch Statistics -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div class="text-center p-4 bg-gray-50 rounded-lg">
+                    <div class="text-2xl font-bold text-gray-900">{{ batch.documents.count }}</div>
+                    <div class="text-sm text-gray-600">Documents Processed</div>
+                </div>
+                <div class="text-center p-4 bg-gray-50 rounded-lg">
+                    <div class="text-2xl font-bold text-gray-900">{{ batch.result_format|upper }}</div>
+                    <div class="text-sm text-gray-600">Output Format</div>
+                </div>
+                <div class="text-center p-4 bg-gray-50 rounded-lg">
+                    <div class="text-2xl font-bold text-gray-900">
+                        {% if batch.status == 'completed' %}100%{% elif batch.status == 'processing' %}50%{% else %}0%{% endif %}
+                    </div>
+                    <div class="text-sm text-gray-600">Completion</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Documents List -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 class="text-xl font-semibold text-gray-900 mb-4">Processed Documents</h3>
+            <div class="space-y-4">
+                {% for doc in batch.documents.all %}
+                    <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                        <div class="flex items-center space-x-4">
+                            <div class="flex-shrink-0">
+                                {% if doc.is_image %}
+                                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                        <i data-feather="image" class="w-6 h-6 text-blue-600"></i>
+                                    </div>
+                                {% elif doc.is_pdf %}
+                                    <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                                        <i data-feather="file-text" class="w-6 h-6 text-red-600"></i>
+                                    </div>
+                                {% else %}
+                                    <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                                        <i data-feather="file" class="w-6 h-6 text-gray-600"></i>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <p class="font-medium text-gray-900">{{ doc.file_name }}</p>
+                                <p class="text-sm text-gray-500">{{ doc.file_type|upper }} • {{ doc.uploaded_at|date:"M d, Y H:i" }}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <a href="{{ doc.file.url }}" target="_blank" class="text-blue-600 hover:text-blue-800">
+                                <i data-feather="eye" class="w-4 h-4"></i>
+                            </a>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Result Preview (if completed) -->
+        {% if batch.status == 'completed' and batch.result_file %}
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-8">
+                <h3 class="text-xl font-semibold text-gray-900 mb-4">Result Preview</h3>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-sm font-medium text-gray-700">Generated {{ batch.result_format|upper }} file</span>
+                        <span class="text-sm text-gray-500">{{ batch.result_file.size|filesizeformat }}</span>
+                    </div>
+                    <div class="bg-white border rounded p-3 text-sm font-mono text-gray-800 overflow-x-auto">
+                        <pre>{{ batch.result_file.read|truncatechars:500 }}</pre>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <script>
+        // Initialize Feather icons
+        feather.replace();
+    </script>
+</body>
+</html> 

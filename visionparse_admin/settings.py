@@ -18,6 +18,9 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = ['*']
 
+LOGIN_REDIRECT_URL = '/parser/'
+LOGOUT_REDIRECT_URL = '/'
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -74,17 +77,21 @@ TEMPLATES = [
 WSGI_APPLICATION = 'visionparse_admin.wsgi.application'
 
 
-# Production (Render)
-DATABASES = {
-    'default': dj_database_url.config("DATABASE_URL")
-}
-
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / "db.sqlite3",
-#     }
-# }
+# Database configuration
+if os.environ.get("RENDER", "") == "true":
+# if False:
+    # Production (Render)
+    DATABASES = {
+        'default': dj_database_url.config("DATABASE_URL")
+    }
+else:
+    # Development (SQLite)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / "db.sqlite3",
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -111,6 +118,5 @@ USE_TZ = True
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATIC_URL = "/static/"
-
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

@@ -1,30 +1,30 @@
+# parser/models.py
+from django.contrib.auth.models import User
 from django.db import models
-import os
-from django.core.validators import FileExtensionValidator
 
-class Document(models.Model):
-    file = models.FileField(
-        upload_to='documents/',
-        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff'])]
-    )
+class UserDocument(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    file = models.FileField(upload_to='user_documents/')
     uploaded_at = models.DateTimeField(auto_now_add=True)
-    file_name = models.CharField(max_length=255, blank=True)
-    file_type = models.CharField(max_length=10, blank=True)
-    
+    file_name = models.CharField(max_length=255)
+    file_type = models.CharField(max_length=10)
+    is_processed = models.BooleanField(default=False)
+
     def save(self, *args, **kwargs):
-        if self.file and self.file.name:
-            self.file_name = os.path.basename(self.file.name)
-            ext = os.path.splitext(self.file.name)[1].lower().replace('.', '')
-            self.file_type = ext
+        if self.file:
+            self.file_name = self.file.name
+            self.file_type = self.file.name.split('.')[-1].lower()
         super().save(*args, **kwargs)
-    
-    def __str__(self):
-        return self.file_name or "Untitled Document"
-    
-    @property
-    def is_image(self):
-        return self.file_type in ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff']
-    
-    @property
-    def is_pdf(self):
-        return self.file_type == 'pdf'
+
+class DocumentBatch(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=[
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed')
+    ])
+    documents = models.ManyToManyField(UserDocument)
+    result_file = models.FileField(upload_to='results/', null=True, blank=True)
+    result_format = models.CharField(max_length=10, choices=[('xml', 'XML'), ('csv', 'CSV')])

@@ -3,52 +3,217 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Document Upload</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VisionParse - Document Upload & Processing</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
 </head>
-<body class="bg-gray-100 text-gray-900">
-
-<div class="container mx-auto p-6">
-    <h1 class="text-3xl font-bold mb-4">Upload Document</h1>
-
-    {% if messages %}
-        <div>
-            {% for message in messages %}
-                <div class="mb-4 p-4 rounded {{ message.tags }} bg-green-100 text-green-700">
-                    {{ message }}
-                </div>
-            {% endfor %}
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900 mb-2">VisionParse</h1>
+            <p class="text-gray-600">Upload multiple documents and extract structured data with AI</p>
         </div>
-    {% endif %}
 
-    <form action="{% url 'upload_doc' %}" method="post" enctype="multipart/form-data" class="mb-6">
-        {% csrf_token %}
-        <div class="flex items-center space-x-4">
-            <input type="file" name="document" required class="p-2 border rounded">
-            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Upload</button>
-        </div>
-    </form>
-
-    <h2 class="text-xl font-semibold mb-3">Uploaded Documents</h2>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {% for doc in documents %}
-            <div class="bg-white p-4 rounded shadow-md">
-                {% if doc.is_image %}
-                    <img src="{{ doc.file.url }}" alt="Preview" class="h-48 w-full object-cover rounded">
-                {% elif doc.is_pdf %}
-                    <div class="h-48 flex items-center justify-center bg-gray-200 text-gray-500">
-                        PDF Preview Not Available
+        <!-- Messages -->
+        {% if messages %}
+            <div class="mb-6">
+                {% for message in messages %}
+                    <div class="p-4 rounded-lg mb-3 {% if message.tags == 'error' %}bg-red-100 text-red-700 border border-red-200{% elif message.tags == 'warning' %}bg-yellow-100 text-yellow-700 border border-yellow-200{% else %}bg-green-100 text-green-700 border border-green-200{% endif %}">
+                        {{ message }}
                     </div>
-                {% endif %}
-                <p class="mt-2 font-medium">{{ doc.file_name }}</p>
-                <form method="post" action="{% url 'delete_document' doc.id %}" class="mt-2">
-                    {% csrf_token %}
-                    <button type="submit" class="text-red-500 hover:underline text-sm">Delete</button>
-                </form>
+                {% endfor %}
             </div>
-        {% endfor %}
-    </div>
-</div>
+        {% endif %}
 
+        <!-- Upload Section -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Upload Documents</h2>
+            
+            <form id="uploadForm" method="POST" enctype="multipart/form-data" class="space-y-6">
+                {% csrf_token %}
+                
+                <!-- Drag & Drop Zone -->
+                <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors cursor-pointer bg-gray-50">
+                    <div class="space-y-4">
+                        <i data-feather="upload" class="w-12 h-12 mx-auto text-gray-400"></i>
+                        <div>
+                            <p class="text-lg font-medium text-gray-900">Drop files here or click to browse</p>
+                            <p class="text-sm text-gray-500 mt-1">Supports PDF, PNG, JPG, JPEG, GIF, BMP, TIFF</p>
+                        </div>
+                    </div>
+                    <input type="file" id="fileInput" name="documents" multiple accept=".pdf,.png,.jpg,.jpeg,.gif,.bmp,.tiff" class="hidden">
+                </div>
+
+                <!-- Selected Files Preview -->
+                <div id="filePreview" class="hidden">
+                    <h3 class="text-lg font-medium text-gray-900 mb-3">Selected Files</h3>
+                    <div id="fileList" class="space-y-2"></div>
+                </div>
+
+                <!-- Parse Button -->
+                <div class="flex justify-center">
+                    <button type="submit" id="parseBtn" disabled class="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center space-x-2">
+                        <i data-feather="play" class="w-5 h-5"></i>
+                        <span>Parse Documents</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Recent Batches -->
+        {% if user_batches %}
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">Recent Processing Batches</h2>
+                <div class="space-y-4">
+                    {% for batch in user_batches %}
+                        <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                            <div class="flex items-center space-x-4">
+                                <div class="flex-shrink-0">
+                                    {% if batch.status == 'completed' %}
+                                        <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                                            <i data-feather="check" class="w-4 h-4 text-green-600"></i>
+                                        </div>
+                                    {% elif batch.status == 'processing' %}
+                                        <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                            <i data-feather="loader" class="w-4 h-4 text-blue-600 animate-spin"></i>
+                                        </div>
+                                    {% elif batch.status == 'failed' %}
+                                        <div class="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                                            <i data-feather="x" class="w-4 h-4 text-red-600"></i>
+                                        </div>
+                                    {% else %}
+                                        <div class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                                            <i data-feather="clock" class="w-4 h-4 text-gray-600"></i>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <p class="font-medium text-gray-900">Batch #{{ batch.id }}</p>
+                                    <p class="text-sm text-gray-500">{{ batch.documents.count }} documents • {{ batch.created_at|date:"M d, Y H:i" }}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span class="px-2 py-1 text-xs font-medium rounded-full 
+                                    {% if batch.status == 'completed' %}bg-green-100 text-green-800
+                                    {% elif batch.status == 'processing' %}bg-blue-100 text-blue-800
+                                    {% elif batch.status == 'failed' %}bg-red-100 text-red-800
+                                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                    {{ batch.status|title }}
+                                </span>
+                                {% if batch.status == 'completed' and batch.result_file %}
+                                    <a href="{{ batch.result_file.url }}" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors">
+                                        Download {{ batch.result_format|upper }}
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <script>
+        // Initialize Feather icons
+        feather.replace();
+
+        // File upload handling
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const filePreview = document.getElementById('filePreview');
+        const fileList = document.getElementById('fileList');
+        const parseBtn = document.getElementById('parseBtn');
+        const uploadForm = document.getElementById('uploadForm');
+
+        // Drag & drop events
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-blue-400', 'bg-blue-50');
+        });
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-blue-400', 'bg-blue-50');
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-blue-400', 'bg-blue-50');
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                updateFilePreview();
+            }
+        });
+
+        // File input change
+        fileInput.addEventListener('change', updateFilePreview);
+
+        function updateFilePreview() {
+            const files = fileInput.files;
+            if (files.length > 0) {
+                filePreview.classList.remove('hidden');
+                fileList.innerHTML = '';
+                
+                Array.from(files).forEach((file, index) => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'flex items-center justify-between p-3 bg-gray-50 rounded border';
+                    fileItem.innerHTML = `
+                        <div class="flex items-center space-x-3">
+                            <i data-feather="file" class="w-5 h-5 text-gray-400"></i>
+                            <div>
+                                <p class="font-medium text-gray-900">${file.name}</p>
+                                <p class="text-sm text-gray-500">${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="removeFile(${index})" class="text-red-500 hover:text-red-700">
+                            <i data-feather="x" class="w-4 h-4"></i>
+                        </button>
+                    `;
+                    fileList.appendChild(fileItem);
+                });
+                
+                parseBtn.disabled = false;
+                feather.replace();
+            } else {
+                filePreview.classList.add('hidden');
+                parseBtn.disabled = true;
+            }
+        }
+
+        function removeFile(index) {
+            const dt = new DataTransfer();
+            const files = fileInput.files;
+            
+            for (let i = 0; i < files.length; i++) {
+                if (i !== index) {
+                    dt.items.add(files[i]);
+                }
+            }
+            
+            fileInput.files = dt.files;
+            updateFilePreview();
+        }
+
+        // Form submission
+        uploadForm.addEventListener('submit', (e) => {
+            if (fileInput.files.length === 0) {
+                e.preventDefault();
+                alert('Please select at least one file to upload.');
+                return;
+            }
+            
+            // Show loading state
+            parseBtn.disabled = true;
+            parseBtn.innerHTML = `
+                <i data-feather="loader" class="w-5 h-5 animate-spin"></i>
+                <span>Processing...</span>
+            `;
+            feather.replace();
+        });
+
+        // Initialize
+        updateFilePreview();
+    </script>
 </body>
 </html>
