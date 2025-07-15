@@ -58,6 +58,27 @@
                     <div id="fileList" class="space-y-2"></div>
                 </div>
 
+                <!-- Custom Fields Section -->
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-medium mb-2">Custom Fields to Extract</label>
+                    <div id="customFieldsContainer" class="space-y-2"></div>
+                    <button type="button" id="addFieldBtn" class="mt-2 px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">+ Add Field</button>
+                </div>
+                <!-- Strict Mode Toggle -->
+                <div class="mb-4 flex items-center">
+                    <input type="checkbox" id="strictMode" name="strict_mode" class="mr-2">
+                    <label for="strictMode" class="text-gray-700">Strict Mode (only extract specified fields)</label>
+                </div>
+                <!-- Output Format Dropdown -->
+                <div class="mb-4">
+                    <label for="resultFormat" class="block text-gray-700 font-medium mb-2">Output Format</label>
+                    <select id="resultFormat" name="result_format" class="border rounded px-3 py-2 w-40">
+                        <option value="xlsx">XLSX</option>
+                        <option value="csv">CSV</option>
+                        <option value="pdf">PDF</option>
+                    </select>
+                </div>
+
                 <!-- Parse Button -->
                 <div class="flex justify-center">
                     <button type="submit" id="parseBtn" disabled class="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center space-x-2">
@@ -216,6 +237,37 @@
                 <span>Processing...</span>
             `;
             feather.replace();
+        });
+
+        // Custom Fields dynamic logic
+        const customFieldsContainer = document.getElementById('customFieldsContainer');
+        const addFieldBtn = document.getElementById('addFieldBtn');
+
+        function addCustomField(value = '') {
+            const fieldDiv = document.createElement('div');
+            fieldDiv.className = 'flex items-center space-x-2';
+            fieldDiv.innerHTML = `
+                <input type="text" name="custom_fields" value="${value}" placeholder="Field name (e.g. invoice_number)" class="border rounded px-3 py-2 flex-1" required />
+                <button type="button" class="removeFieldBtn text-red-500 hover:text-red-700">Remove</button>
+            `;
+            customFieldsContainer.appendChild(fieldDiv);
+            fieldDiv.querySelector('.removeFieldBtn').onclick = () => fieldDiv.remove();
+        }
+        addFieldBtn.onclick = () => addCustomField();
+        // Add one field by default
+        if (customFieldsContainer.children.length === 0) addCustomField();
+        // On submit, collect all custom fields into hidden inputs
+        uploadForm.addEventListener('submit', (e) => {
+            // Remove any previous hidden fields
+            document.querySelectorAll('input[name="custom_fields[]"]').forEach(el => el.remove());
+            // Add all custom fields as hidden inputs (array)
+            Array.from(customFieldsContainer.querySelectorAll('input[name="custom_fields"]')).forEach(input => {
+                const hidden = document.createElement('input');
+                hidden.type = 'hidden';
+                hidden.name = 'custom_fields[]';
+                hidden.value = input.value;
+                uploadForm.appendChild(hidden);
+            });
         });
 
         // Initialize

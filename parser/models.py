@@ -27,4 +27,6 @@ class DocumentBatch(models.Model):
     ])
     documents = models.ManyToManyField(UserDocument)
     result_file = models.FileField(upload_to='results/', null=True, blank=True)
-    result_format = models.CharField(max_length=10, choices=[('xml', 'XML'), ('csv', 'CSV')])
+    custom_fields = models.JSONField(default=list)  # Store as list of strings
+    strict_mode = models.BooleanField(default=False)
+    result_format = models.CharField(max_length=10, choices=[('csv', 'CSV'), ('xlsx', 'XLSX'), ('pdf', 'PDF')])

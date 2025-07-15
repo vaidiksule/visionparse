@@ -39,10 +39,18 @@
                         {% else %}bg-gray-100 text-gray-800{% endif %}">
                         {{ batch.status|title }}
                     </span>
-                    {% if batch.status == 'completed' and batch.result_file %}
-                        <a href="{{ batch.result_file.url }}" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2">
+                    {% if batch.status == 'completed' %}
+                        <a href="{% url 'download_batch_result' batch.id 'xlsx' %}" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2">
                             <i data-feather="download" class="w-4 h-4"></i>
-                            <span>Download {{ batch.result_format|upper }}</span>
+                            <span>Download XLSX</span>
+                        </a>
+                        <a href="{% url 'download_batch_result' batch.id 'csv' %}" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2">
+                            <i data-feather="download" class="w-4 h-4"></i>
+                            <span>Download CSV</span>
+                        </a>
+                        <a href="{% url 'download_batch_result' batch.id 'pdf' %}" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2">
+                            <i data-feather="download" class="w-4 h-4"></i>
+                            <span>Download PDF</span>
                         </a>
                     {% endif %}
                 </div>

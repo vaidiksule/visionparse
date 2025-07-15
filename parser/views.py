@@ -2,13 +2,23 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.http import JsonResponse
+from django.http import JsonResponse, FileResponse, Http404
 from django.views.decorators.csrf import csrf_exempt
 from django.core.files.base import ContentFile
 from django.utils.text import get_valid_filename
 from .models import UserDocument, DocumentBatch
 import os
 import uuid
+import json
+from parser.gemini_parser import extract_data_from_file
+import xml.etree.ElementTree as ET
+import openpyxl
+from openpyxl.utils import get_column_letter
+from io import BytesIO
+import csv
+from io import StringIO
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
 
 def get_or_create_default_user():
     """Get or create a default user for testing without authentication"""
@@ -53,12 +63,17 @@ def upload_and_parse_documents(request):
             messages.error(request, 'No valid files found. Please upload PDF or image files.')
             return render(request, 'parser/upload.html', {'user_batches': user_batches})
         
+        # Get custom fields, strict mode, and result format from POST
+        custom_fields = request.POST.getlist('custom_fields[]')
+        strict_mode = bool(request.POST.get('strict_mode'))
+        result_format = request.POST.get('result_format', 'xlsx')
         # Create batch
         batch = DocumentBatch.objects.create(
-            # user=request.user,  # ORIGINAL
             user=default_user,  # TEMPORARY
             status='pending',
-            result_format='xml'  # Default to XML for now
+            result_format=result_format,
+            custom_fields=custom_fields,
+            strict_mode=strict_mode
         )
         
         # Save user documents
@@ -74,12 +89,95 @@ def upload_and_parse_documents(request):
         # Mock AI processing (replace with actual AI API call later)
         batch.status = 'processing'
         batch.save()
-        
-        # Generate mock XML result
-        mock_xml = generate_mock_xml(batch)
-        batch.result_file.save(f'result_{batch.id}.xml', ContentFile(mock_xml))
+
+        # Gemini API processing
+        print(f"[Batch] Starting Gemini API processing for batch {batch.id}")
+        all_data = []
+        for doc in batch.documents.all():
+            file_path = doc.file.path
+            print(f"[Batch] Sending file to Gemini: {file_path}")
+            prompt = build_gemini_prompt(custom_fields, strict_mode)
+            extracted_json = extract_data_from_file(file_path, prompt=prompt)
+            try:
+                all_data.append(json.loads(extracted_json))
+            except Exception as e:
+                print(f"[Batch] Error loading JSON from Gemini response: {e}")
+                all_data.append({})
+
+        # Generate result file in selected format
+        if result_format == 'xlsx':
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "Invoices"
+            if all_data and isinstance(all_data[0], dict):
+                headers = list(all_data[0].keys())
+                ws.append(headers)
+                for item in all_data:
+                    row = []
+                    for h in headers:
+                        v = item.get(h, "")
+                        if isinstance(v, (list, dict)):
+                            v = json.dumps(v, ensure_ascii=False)
+                        row.append(v)
+                    ws.append(row)
+            else:
+                ws.append(["No data extracted"])
+            xlsx_io = BytesIO()
+            wb.save(xlsx_io)
+            xlsx_io.seek(0)
+            batch.result_file.save(f'result_{batch.id}.xlsx', ContentFile(xlsx_io.read()))
+        elif result_format == 'csv':
+            csv_io = StringIO()
+            if all_data and isinstance(all_data[0], dict):
+                headers = list(all_data[0].keys())
+                writer = csv.writer(csv_io)
+                writer.writerow(headers)
+                for item in all_data:
+                    row = []
+                    for h in headers:
+                        v = item.get(h, "")
+                        if isinstance(v, (list, dict)):
+                            v = json.dumps(v, ensure_ascii=False)
+                        row.append(v)
+                    writer.writerow(row)
+            else:
+                writer = csv.writer(csv_io)
+                writer.writerow(["No data extracted"])
+            batch.result_file.save(f'result_{batch.id}.csv', ContentFile(csv_io.getvalue().encode('utf-8')))
+        elif result_format == 'pdf':
+            pdf_io = BytesIO()
+            c = canvas.Canvas(pdf_io, pagesize=letter)
+            width, height = letter
+            y = height - 40
+            if all_data and isinstance(all_data[0], dict):
+                headers = list(all_data[0].keys())
+                c.setFont("Helvetica-Bold", 12)
+                for i, h in enumerate(headers):
+                    c.drawString(40 + i*120, y, h)
+                y -= 20
+                c.setFont("Helvetica", 10)
+                for item in all_data:
+                    row = []
+                    for h in headers:
+                        v = item.get(h, "")
+                        if isinstance(v, (list, dict)):
+                            v = json.dumps(v, ensure_ascii=False)
+                        row.append(str(v))
+                    for i, v in enumerate(row):
+                        c.drawString(40 + i*120, y, v[:30])
+                    y -= 20
+                    if y < 40:
+                        c.showPage()
+                        y = height - 40
+            else:
+                c.drawString(40, y, "No data extracted")
+            c.save()
+            pdf_io.seek(0)
+            batch.result_file.save(f'result_{batch.id}.pdf', ContentFile(pdf_io.read()))
         batch.status = 'completed'
         batch.save()
+        print(f"[Batch] Result file saved for batch {batch.id} as {result_format}")
+        print(f"[Batch] Batch {batch.id} marked as completed.")
         
         messages.success(request, f'Successfully processed {len(valid_files)} documents!')
         return redirect('batch_result', batch_id=batch.id)
@@ -107,33 +205,111 @@ def delete_document(request, doc_id):
             return JsonResponse({'success': False, 'error': 'Document not found'})
     return JsonResponse({'success': False, 'error': 'Invalid request'})
 
-def generate_mock_xml(batch):
-    """Generate mock XML result for demonstration"""
-    xml_content = f'''<?xml version="1.0" encoding="UTF-8"?>
-<invoice_data>
-    <batch_info>
-        <batch_id>{batch.id}</batch_id>
-        <created_at>{batch.created_at}</created_at>
-        <total_documents>{batch.documents.count()}</total_documents>
-    </batch_info>
-    <documents>'''
-    
-    for i, doc in enumerate(batch.documents.all(), 1):
-        xml_content += f'''
-        <document id="{i}">
-            <filename>{doc.file_name}</filename>
-            <file_type>{doc.file_type}</file_type>
-            <uploaded_at>{doc.uploaded_at}</uploaded_at>
-            <extracted_data>
-                <invoice_number>INV-{batch.id:04d}-{i:03d}</invoice_number>
-                <amount>${1000 + (i * 50)}.00</amount>
-                <vendor>Vendor {i}</vendor>
-                <date>2024-01-{i:02d}</date>
-            </extracted_data>
-        </document>'''
-    
-    xml_content += '''
-    </documents>
-</invoice_data>'''
-    
-    return xml_content
+def build_gemini_prompt(custom_fields, strict):
+    fields_text = ', '.join(custom_fields)
+    if strict:
+        return f"Extract only the following fields from this document: {fields_text}. Return as JSON."
+    else:
+        return f"Extract the following fields from this document: {fields_text}. You can also include any other useful data. Return as JSON."
+
+def generate_result_file(batch, all_data, result_format):
+    # Returns (filename, file_bytes)
+    import openpyxl
+    import json
+    from io import BytesIO, StringIO
+    import csv
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+    if result_format == 'xlsx':
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Invoices"
+        if all_data and isinstance(all_data[0], dict):
+            headers = list(all_data[0].keys())
+            ws.append(headers)
+            for item in all_data:
+                row = []
+                for h in headers:
+                    v = item.get(h, "")
+                    if isinstance(v, (list, dict)):
+                        v = json.dumps(v, ensure_ascii=False)
+                    row.append(v)
+                ws.append(row)
+        else:
+            ws.append(["No data extracted"])
+        xlsx_io = BytesIO()
+        wb.save(xlsx_io)
+        xlsx_io.seek(0)
+        return (f'result_{batch.id}.xlsx', xlsx_io.read())
+    elif result_format == 'csv':
+        csv_io = StringIO()
+        if all_data and isinstance(all_data[0], dict):
+            headers = list(all_data[0].keys())
+            writer = csv.writer(csv_io)
+            writer.writerow(headers)
+            for item in all_data:
+                row = []
+                for h in headers:
+                    v = item.get(h, "")
+                    if isinstance(v, (list, dict)):
+                        v = json.dumps(v, ensure_ascii=False)
+                    row.append(v)
+                writer.writerow(row)
+        else:
+            writer = csv.writer(csv_io)
+            writer.writerow(["No data extracted"])
+        return (f'result_{batch.id}.csv', csv_io.getvalue().encode('utf-8'))
+    elif result_format == 'pdf':
+        pdf_io = BytesIO()
+        c = canvas.Canvas(pdf_io, pagesize=letter)
+        width, height = letter
+        y = height - 40
+        if all_data and isinstance(all_data[0], dict):
+            headers = list(all_data[0].keys())
+            c.setFont("Helvetica-Bold", 12)
+            for i, h in enumerate(headers):
+                c.drawString(40 + i*120, y, h)
+            y -= 20
+            c.setFont("Helvetica", 10)
+            for item in all_data:
+                row = []
+                for h in headers:
+                    v = item.get(h, "")
+                    if isinstance(v, (list, dict)):
+                        v = json.dumps(v, ensure_ascii=False)
+                    row.append(str(v))
+                for i, v in enumerate(row):
+                    c.drawString(40 + i*120, y, v[:30])
+                y -= 20
+                if y < 40:
+                    c.showPage()
+                    y = height - 40
+        else:
+            c.drawString(40, y, "No data extracted")
+        c.save()
+        pdf_io.seek(0)
+        return (f'result_{batch.id}.pdf', pdf_io.read())
+    else:
+        raise ValueError("Unsupported format")
+
+def download_batch_result(request, batch_id, format):
+    default_user = get_or_create_default_user()
+    batch = get_object_or_404(DocumentBatch, id=batch_id, user=default_user)
+    # Try to load all_data from the batch's documents
+    all_data = []
+    for doc in batch.documents.all():
+        file_path = doc.file.path
+        prompt = build_gemini_prompt(batch.custom_fields, batch.strict_mode)
+        from parser.gemini_parser import extract_data_from_file
+        extracted_json = extract_data_from_file(file_path, prompt=prompt)
+        try:
+            all_data.append(json.loads(extracted_json))
+        except Exception as e:
+            all_data.append({})
+    filename, file_bytes = generate_result_file(batch, all_data, format)
+    content_type = {
+        'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'csv': 'text/csv',
+        'pdf': 'application/pdf',
+    }.get(format, 'application/octet-stream')
+    return FileResponse(BytesIO(file_bytes), as_attachment=True, filename=filename, content_type=content_type)
