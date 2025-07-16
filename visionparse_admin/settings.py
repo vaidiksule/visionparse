@@ -10,7 +10,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-NPM_BIN_PATH = r"C:\Program Files\nodejs\npm.cmd"
+NPM_BIN_PATH = os.environ.get("NPM_BIN_PATH", r"C:\Program Files\nodejs\npm.cmd")
 
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-q5i0)eixrw)!@z^s-#me#mmi4alvzrjh0d1k)wrmjfarp!8n2x')
 
@@ -117,4 +117,3 @@ STATIC_URL = "/static/"
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
-# SESSION_FILE_PATH is not needed for signed cookies
