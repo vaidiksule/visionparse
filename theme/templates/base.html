@@ -2,15 +2,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Django Tailwind</title>
+    <title>VisionParse</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     {% tailwind_css %}
 </head>
-
 <body class="bg-gray-50 text-black font-serif leading-normal tracking-normal">
-
     <nav class="flex justify-between items-center px-8 py-4 bg-white shadow">
         <a href="/" class="text-2xl font-bold">VisionParse</a>
         <div>
@@ -23,8 +21,6 @@
             {% endif %}
         </div>
     </nav>
-
-
     <div class="container mx-auto">
         {% block content %}{% endblock %}
     </div>
