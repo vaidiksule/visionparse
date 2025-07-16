@@ -1,7 +1,7 @@
 # parser/models.py
 # from django.contrib.auth.models import User
 # from django.db import models
-from djongo import models as djongo_models
+# from djongo import models as djongo_models
 from mongoengine import Document as MongoDocument, StringField, DateTimeField, BooleanField, FileField, ListField, ReferenceField, EmailField
 import datetime
 

@@ -1,4 +1,5 @@
-from tailwind.apps import TailwindConfig
+from django.apps import AppConfig
 
-class ThemeConfig(TailwindConfig):
+
+class ThemeConfig(AppConfig):
     name = 'theme'
