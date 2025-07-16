@@ -7,3 +7,7 @@ def hello_world(request):
 
 def index(request):
     return render(request, 'core/index.html')
+
+
+def home_view(request):
+    return render(request, 'core/home.html')

@@ -2,7 +2,7 @@
 # from django.contrib.auth.models import User
 # from django.db import models
 from djongo import models as djongo_models
-from mongoengine import Document as MongoDocument, StringField, DateTimeField, BooleanField, FileField, ListField, ReferenceField
+from mongoengine import Document as MongoDocument, StringField, DateTimeField, BooleanField, FileField, ListField, ReferenceField, EmailField
 import datetime
 
 class UserDocument(MongoDocument):
@@ -27,5 +27,14 @@ class DocumentBatch(MongoDocument):
     result_format = StringField(choices=('csv', 'json'))
     status = StringField(choices=('pending', 'processing', 'completed', 'failed'), default='pending')
     created_at = DateTimeField(default=datetime.datetime.utcnow)
+    user = StringField(required=True)  # user_id from CustomUser
 
     meta = {'collection': 'document_batches'}
+
+class CustomUser(MongoDocument):
+    username = StringField(required=True, unique=True, max_length=150)
+    email = EmailField(required=True, unique=True, max_length=255)
+    password_hash = StringField(required=True)
+    created_at = DateTimeField(default=datetime.datetime.utcnow)
+
+    meta = {'collection': 'custom_users'}

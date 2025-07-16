@@ -1,10 +1,13 @@
-﻿from django.shortcuts import render, redirect
+﻿from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import UserCreationForm
+from django.shortcuts import render, redirect
 from django.contrib import messages
+from django.contrib.auth.hashers import make_password, check_password
 from django.http import JsonResponse, FileResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.core.files.base import ContentFile
 from django.utils.text import get_valid_filename
-from .models import UserDocument, DocumentBatch
+from .models import UserDocument, DocumentBatch, CustomUser
 import os
 import json
 from parser.gemini_parser import extract_data_from_file
@@ -14,6 +17,8 @@ import csv
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from bson import ObjectId
+from functools import wraps
+from django.http import HttpResponseRedirect
 
 # =========================
 # Helper Functions
@@ -83,12 +88,67 @@ def process_documents_with_gemini(documents, custom_fields, strict_mode):
             all_data.append({})
     return all_data
 
+def custom_login_required(view_func):
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        if not request.session.get('user_id'):
+            return HttpResponseRedirect('/login/')
+        return view_func(request, *args, **kwargs)
+    return _wrapped_view
+
 # =========================
 # Views
 # =========================
 
+def register_view(request):
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        if not username or not email or not password:
+            messages.error(request, 'All fields are required.')
+            return render(request, 'registration/register.html')
+        if CustomUser.objects(email=email).first():
+            messages.error(request, 'Email already registered.')
+            return render(request, 'registration/register.html')
+        if CustomUser.objects(username=username).first():
+            messages.error(request, 'Username already taken.')
+            return render(request, 'registration/register.html')
+        user = CustomUser(
+            username=username,
+            email=email,
+            password_hash=make_password(password)
+        )
+        user.save()
+        request.session['user_id'] = str(user.id)
+        request.session['username'] = user.username
+        return redirect('/parser/')
+    return render(request, 'registration/register.html')
+
+def login_view(request):
+    if request.method == 'POST':
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        if not email or not password:
+            messages.error(request, 'Both fields are required.')
+            return render(request, 'registration/login.html')
+        user = CustomUser.objects(email=email).first()
+        if not user or not check_password(password, user.password_hash):
+            messages.error(request, 'Invalid email or password.')
+            return render(request, 'registration/login.html')
+        request.session['user_id'] = str(user.id)
+        request.session['username'] = user.username
+        return redirect('/parser/')
+    return render(request, 'registration/login.html')
+
+def logout_view(request):
+    request.session.flush()
+    return redirect('/')
+
+@custom_login_required
 def upload_and_parse_documents(request):
-    user_batches = DocumentBatch.objects.order_by('-created_at').limit(5)
+    user_id = request.session.get('user_id')
+    user_batches = DocumentBatch.objects(user=user_id).order_by('-created_at').limit(5)
 
     if request.method == 'POST':
         uploaded_files = request.FILES.getlist('documents')
@@ -111,7 +171,8 @@ def upload_and_parse_documents(request):
             status='processing',
             result_format=result_format,
             custom_fields=custom_fields,
-            strict_mode=strict_mode
+            strict_mode=strict_mode,
+            user=user_id
         )
         batch.save()
 
