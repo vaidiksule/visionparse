@@ -81,11 +81,7 @@ connect(host=MONGO_URI)
 #fallback for mongoengine
 DATABASES = {
     'default': {
-        'ENGINE': 'djongo',
-        'NAME': 'visionparse',
-        'CLIENT': {
-            'host': MONGO_URI,
-        },
+        'ENGINE': 'django.db.backends.dummy'
     }
 }
 
