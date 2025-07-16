@@ -1,32 +1,31 @@
 # parser/models.py
-from django.contrib.auth.models import User
-from django.db import models
+# from django.contrib.auth.models import User
+# from django.db import models
+from djongo import models as djongo_models
+from mongoengine import Document as MongoDocument, StringField, DateTimeField, BooleanField, FileField, ListField, ReferenceField
+import datetime
 
-class UserDocument(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    file = models.FileField(upload_to='user_documents/')
-    uploaded_at = models.DateTimeField(auto_now_add=True)
-    file_name = models.CharField(max_length=255)
-    file_type = models.CharField(max_length=10)
-    is_processed = models.BooleanField(default=False)
+class UserDocument(MongoDocument):
+    file = FileField(required=True)
+    file_name = StringField(max_length=255)
+    file_type = StringField(max_length=10)
+    uploaded_at = DateTimeField(default=datetime.datetime.utcnow)
+    is_processed = BooleanField(default=False)
 
-    def save(self, *args, **kwargs):
+    meta = {'collection': 'user_documents'}
+
+    def clean(self):
         if self.file:
-            self.file_name = self.file.name
-            self.file_type = self.file.name.split('.')[-1].lower()
-        super().save(*args, **kwargs)
+            self.file_name = getattr(self.file, 'name', '') or ''
+            self.file_type = self.file_name.split('.')[-1].lower() if self.file_name else ''
 
-class DocumentBatch(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    created_at = models.DateTimeField(auto_now_add=True)
-    status = models.CharField(max_length=20, choices=[
-        ('pending', 'Pending'),
-        ('processing', 'Processing'),
-        ('completed', 'Completed'),
-        ('failed', 'Failed')
-    ])
-    documents = models.ManyToManyField(UserDocument)
-    result_file = models.FileField(upload_to='results/', null=True, blank=True)
-    custom_fields = models.JSONField(default=list)  # Store as list of strings
-    strict_mode = models.BooleanField(default=False)
-    result_format = models.CharField(max_length=10, choices=[('csv', 'CSV'), ('xlsx', 'XLSX'), ('pdf', 'PDF')])
+class DocumentBatch(MongoDocument):
+    documents = ListField(ReferenceField(UserDocument))
+    result_file = FileField()
+    custom_fields = ListField(StringField())
+    strict_mode = BooleanField(default=False)
+    result_format = StringField(choices=('csv', 'json'))
+    status = StringField(choices=('pending', 'processing', 'completed', 'failed'), default='pending')
+    created_at = DateTimeField(default=datetime.datetime.utcnow)
+
+    meta = {'collection': 'document_batches'}

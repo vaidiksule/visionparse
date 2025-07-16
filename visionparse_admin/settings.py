@@ -50,13 +50,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django_browser_reload.middleware.BrowserReloadMiddleware',
 ]
 
-
-if os.environ.get("RENDER", "") != "true":  # Only include during local dev
-    INSTALLED_APPS += ["django_browser_reload"]
-    MIDDLEWARE.insert(0, "django_browser_reload.middleware.BrowserReloadMiddleware")
 
 ROOT_URLCONF = 'visionparse_admin.urls'
 
@@ -79,20 +74,16 @@ WSGI_APPLICATION = 'visionparse_admin.wsgi.application'
 
 
 # Database configuration
-if os.environ.get("RENDER", "") == "true":
-# if False:
-    # Production (Render)
-    DATABASES = {
-        'default': dj_database_url.config("DATABASE_URL")
+MONGO_URI = config('MONGO_URI')
+DATABASES = {
+    'default': {
+        'ENGINE': 'djongo',
+        'NAME': 'visionparse',
+        'CLIENT': {
+            'host': MONGO_URI,
+        },
     }
-else:
-    # Development (SQLite)
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / "db.sqlite3",
-        }
-    }
+}
 
 AUTH_PASSWORD_VALIDATORS = [
     {

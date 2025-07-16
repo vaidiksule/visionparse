@@ -73,9 +73,14 @@
                 <div class="mb-4">
                     <label for="resultFormat" class="block text-gray-700 font-medium mb-2">Output Format</label>
                     <select id="resultFormat" name="result_format" class="border rounded px-3 py-2 w-40">
-                        <option value="xlsx">XLSX</option>
-                        <option value="csv">CSV</option>
-                        <option value="pdf">PDF</option>
+                        {% if allowed_formats %}
+                            {% for fmt in allowed_formats %}
+                                <option value="{{ fmt }}">{{ fmt|upper }}</option>
+                            {% endfor %}
+                        {% else %}
+                            <option value="csv">CSV</option>
+                            <option value="json">JSON</option>
+                        {% endif %}
                     </select>
                 </div>
 
