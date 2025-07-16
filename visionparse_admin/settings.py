@@ -74,20 +74,20 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'visionparse_admin.wsgi.application'
 
-
 # Database configuration
-# MONGO_URI = config('MONGO_URI')
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'djongo',
-#         'NAME': 'visionparse',
-#         'CLIENT': {
-#             'host': MONGO_URI,
-#         },
-#     }
-# }
 MONGO_URI = config('MONGO_URI', default='mongodb://localhost:27017/visionparse')
 connect(host=MONGO_URI)
+
+#fallback for mongoengine
+DATABASES = {
+    'default': {
+        'ENGINE': 'djongo',
+        'NAME': 'visionparse',
+        'CLIENT': {
+            'host': MONGO_URI,
+        },
+    }
+}
 
 
 AUTH_PASSWORD_VALIDATORS = [
